@@ -22,7 +22,7 @@ public:
   virtual const char * GetClassName() { return "Session"; };
 
   int Start();
-  int Stop() { this->Active = 0; };
+  void Stop() { this->Active = 0; };
 
   inline int     IsActive()    { return this->Active; }
 
