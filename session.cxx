@@ -193,7 +193,7 @@ int Session::Process()
   ss << this->Name << ", "
      << secSys << "." << std::setw(9) << std::setfill('0') << nanosecSys << ", "
      << secMsg << "." << std::setw(9) << std::setfill('0') << nanosecMsg << ", "
-     << headerMsg->GetDeviceName() << ", " << headerMsg->GetDeviceType();
+     << headerMsg->GetDeviceName() << ", " << headerMsg->GetDeviceType() << ", ";
 
   this->logger->Print(ss.str());
 
