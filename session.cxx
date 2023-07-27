@@ -151,9 +151,11 @@ int Session::Process()
 
   //------------------------------------------------------------
   // Allocate a time stamp
-  igtl::TimeStamp::Pointer ts;
-  ts = igtl::TimeStamp::New();
+  igtl::TimeStamp::Pointer tsMsg;
+  tsMsg = igtl::TimeStamp::New();
 
+  igtl::TimeStamp::Pointer tsSys;
+  tsSys = igtl::TimeStamp::New();
 
   // Initialize receive buffer
   headerMsg->InitPack();
@@ -176,15 +178,22 @@ int Session::Process()
   headerMsg->Unpack();
 
   // Get time stamp
-  igtlUint32 sec;
-  igtlUint32 nanosec;
+  igtlUint32 secMsg;
+  igtlUint32 nanosecMsg;
+  igtlUint32 secSys;
+  igtlUint32 nanosecSys;
 
-  headerMsg->GetTimeStamp(ts);
-  ts->GetTimeStamp(&sec, &nanosec);
+  headerMsg->GetTimeStamp(tsMsg);
+  tsMsg->GetTimeStamp(&secMsg, &nanosecMsg);
+
+  tsSys->GetTime();
+  tsSys->GetTimeStamp(&secSys, &nanosecSys);
 
   std::stringstream ss;
-  ss << this->Name << ", " << sec << "." << std::setw(9) << std::setfill('0') << nanosec
-     << ", " << headerMsg->GetDeviceName() << ", " << headerMsg->GetDeviceType();
+  ss << this->Name << ", "
+     << secSys << "." << std::setw(9) << std::setfill('0') << nanosecSys << ", "
+     << secMsg << "." << std::setw(9) << std::setfill('0') << nanosecMsg << ", "
+     << headerMsg->GetDeviceName() << ", " << headerMsg->GetDeviceType();
 
   this->logger->Print(ss.str());
 
@@ -233,6 +242,9 @@ int Session::Process()
     //std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
     //std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
     fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
+    std::stringstream ss;
+    ss << std::endl;
+    this->logger->Print(ss.str());
     }
 
   return 0;

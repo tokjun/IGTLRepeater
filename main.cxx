@@ -114,15 +114,17 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
 
   igtl::Logger::Pointer logger = igtl::Logger::New();
 
-  sessionUp->SetSockets(clientSocket, serverSocket);
-  sessionUp->SetMutexLocks(clientLock, serverLock);
-  sessionUp->SetLogger(logger);
-  sessionUp->SetName("C->S");
-
-  sessionDown->SetSockets(serverSocket, clientSocket);
-  sessionDown->SetMutexLocks(serverLock, clientLock);
+  // Note that 'clientSocket' is connected to the server host,
+  // and 'serverSocket' is waiting for connection from the client host.
+  sessionDown->SetSockets(clientSocket, serverSocket);
+  sessionDown->SetMutexLocks(clientLock, serverLock);
   sessionDown->SetLogger(logger);
   sessionDown->SetName("S->C");
+
+  sessionUp->SetSockets(serverSocket, clientSocket);
+  sessionUp->SetMutexLocks(serverLock, clientLock);
+  sessionUp->SetLogger(logger);
+  sessionUp->SetName("C->S");
 
   sessionUp->Start();
   sessionDown->Start();
