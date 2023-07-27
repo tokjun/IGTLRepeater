@@ -106,30 +106,34 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
     return 0;
     }
 
-  igtl::MultiThreader::Pointer threader = igtl::MultiThreader::New();
+  igtl::Session::Pointer sessionUp = igtl::Session::New();
+  igtl::Session::Pointer sessionDown = igtl::Session::New();
+  igtl::MutexLock::Pointer clientLock = igtl::MutexLock::New();
+  igtl::MutexLock::Pointer serverLock = igtl::MutexLock::New();
 
-  // from client to server
-  ThreadData tdup;
-  tdup.fromSocket = clientSocket;
-  tdup.toSocket = serverSocket;
-  int idup = threader->SpawnThread((igtl::ThreadFunctionType) &SessionThread, &tdup);
+  sessionUp->SetSockets(clientSocket, serverSocket);
+  sessionUp->SetMutexLocks(clientLock, serverLock);
 
-  // from server to client
-  ThreadData tddown;
-  tddown.fromSocket = serverSocket;
-  tddown.toSocket = clientSocket;
-  int iddown = threader->SpawnThread((igtl::ThreadFunctionType) &SessionThread, &tddown);
+  sessionDown->SetSockets(serverSocket, clientSocket);
+  sessionDown->SetMutexLocks(serverLock, clientLock);
 
+  sessionUp->Start();
+  sessionDown->Start();
 
   // Monitor
-  for (;;)
+  while(sessionUp->IsActive() && sessionDown->IsActive())
     {
-    igtl::Sleep(1000);
+    std::cerr << "Alive!" << std::endl;
+    igtl::Sleep(500);
     }
+
   //threader->TerminateThread(tdup.threadID);
-  threader->TerminateThread(idup);
+  //threader->TerminateThread(idup);
   //threader->TerminateThread(tddown.threadID);
-  threader->TerminateThread(iddown);
+  //threader->TerminateThread(iddown);
+  //
+  sessionUp->Stop();
+  sessionDown->Stop();
 
   //------------------------------------------------------------
   // Close connection (The example code never reaches this section ...)

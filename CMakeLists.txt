@@ -11,6 +11,7 @@ include(${OpenIGTLink_USE_FILE})
 
 set(igtlRepeater_SOURCES
   session.cxx
+  logger.cxx
   )
 
 ADD_EXECUTABLE(igtlrepeater

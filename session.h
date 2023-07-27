@@ -2,32 +2,84 @@
 #define SESSION_H
 
 #include "igtlSocket.h"
+#include "igtlMultiThreader.h"
 #include "igtlMutexLock.h"
 #include "igtlMessageHeader.h"
 
+namespace igtl
+{
 
-typedef struct {
+class IGTLCommon_EXPORT Session : public Object
+{
+public:
+
+  igtlTypeMacro(igtl::Session, igtl::Object)
+  igtlNewMacro(igtl::Session);
+
+public:
+
+  virtual const char * GetClassName() { return "Session"; };
+
+  int Start();
+  int Stop() { this->Active = 0; };
+
+  inline int     IsActive()    { return this->Active; }
+
+  void SetSockets(igtl::Socket * from, igtl::Socket * to)
+  {
+    this->fromSocket = from;
+    this->toSocket   = to;
+  };
+
+  void SetMutexLocks(igtl::MutexLock * from, igtl::MutexLock * to)
+  {
+    this->fromLock = from;
+    this->toLock   = to;
+  };
+
+  static void    MonitorThreadFunction(void * ptr);
+
+protected:
+
+  Session();
+  ~Session();
+
+  void           PrintSelf(std::ostream& os) const;
+
+  virtual int    Process();
+
+  int ReceiveTransform(igtl::MessageHeader * header);
+  int ReceivePosition(igtl::MessageHeader * header);
+  int ReceiveImage(igtl::MessageHeader * header);
+  int ReceiveStatus(igtl::MessageHeader * header);
+
+#if OpenIGTLink_PROTOCOL_VERSION >= 2
+  int ReceivePoint(igtl::MessageHeader * header);
+  int ReceiveTrajectory(igtl::MessageHeader::Pointer& header);
+  int ReceiveString(igtl::MessageHeader * header);
+  int ReceiveBind(igtl::MessageHeader * header);
+  int ReceiveCapability(igtl::MessageHeader * header);
+#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
+
+
+protected:
+
+  int            Active;  // 0: Not active; 1: Active; -1: exiting
+
+  igtl::MultiThreader::Pointer Threader;
+
   igtl::Socket * fromSocket;
   igtl::Socket * toSocket;
   igtl::MutexLock * fromLock;
   igtl::MutexLock * toLock;
-} ThreadData;
+
+  int id;
+  int nThread;
+
+};
+
+}
 
 
-int SessionThread(void* ptr);
-
-int ReceiveTransform(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-int ReceivePosition(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-int ReceiveImage(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-int ReceiveStatus(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-
-
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
-  int ReceivePoint(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-  int ReceiveTrajectory(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader::Pointer& header);
-  int ReceiveString(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-  int ReceiveBind(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-  int ReceiveCapability(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header);
-#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
 
 #endif //

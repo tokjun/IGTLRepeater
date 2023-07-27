@@ -9,6 +9,7 @@
 
 #include "igtlMultiThreader.h"
 #include "igtlOSUtil.h"
+#include "igtlTimeStamp.h"
 
 #include "igtlMessageHeader.h"
 #include "igtlTransformMessage.h"
@@ -29,24 +30,112 @@
 #endif // OpenIGTLink_PROTOCOL_VERSION >= 2
 
 
-int SessionThread(void* ptr)
+namespace igtl
 {
-  // Return 1: Closed by the 'from' host
-  // Return 2: Closed by the 'to' host
 
-  //------------------------------------------------------------
-  // Get thread information
+//-----------------------------------------------------------------------------
+Session::Session()
+{
+  this->Active   = 0;
+  this->Threader = igtl::MultiThreader::New();
+
+  this->fromSocket = NULL;
+  this->toSocket = NULL;
+  this->fromLock = NULL;
+  this->toLock = NULL;
+}
+
+//-----------------------------------------------------------------------------
+Session::~Session()
+{
+}
+
+//-----------------------------------------------------------------------------
+void Session::PrintSelf(std::ostream& os) const
+{
+  this->Superclass::PrintSelf(os);
+}
+
+int Session::Start()
+{
+  if (!this->fromSocket)
+    {
+    std::cerr << "ERROR: no 'from' socket" << std::endl;
+    return 0;
+    }
+
+  if (!this->toSocket)
+    {
+    std::cerr << "ERROR: no 'to' socket" << std::endl;
+    return 0;
+    }
+
+  if (!this->fromLock)
+    {
+    std::cerr << "ERROR: no 'from' lock" << std::endl;
+    return 0;
+    }
+
+  if (!this->toLock)
+    {
+    std::cerr << "ERROR: no 'to' lock" << std::endl;
+    return 0;
+    }
+
+  if (this->Active == 0)
+    {
+    this->Active = 1;
+    this->Threader->SpawnThread((igtl::ThreadFunctionType) &Session::MonitorThreadFunction, this);
+    return 1;
+    }
+  else
+    {
+    std::cerr << "ERROR: the thread is already running" << std::endl;
+    return 0;
+    }
+}
+
+
+//-----------------------------------------------------------------------------
+void Session::MonitorThreadFunction(void * ptr)
+{
+
   igtl::MultiThreader::ThreadInfo* info =
     static_cast<igtl::MultiThreader::ThreadInfo*>(ptr);
 
-  int id      = info->ThreadID;
-  int nThread = info->NumberOfThreads;
-  ThreadData* data = static_cast<ThreadData*>(info->UserData);
+  Session * con = static_cast<Session *>(info->UserData);
+  con->id      = info->ThreadID;
+  con->nThread = info->NumberOfThreads;
 
-  std::cerr << "Starting Thread #" << id << std::endl;
+  std::cerr << "Starting Thread #" << con->id << std::endl;
+  std::cerr << "MonitorThreadFunction() : Starting a thread..." << std::endl;
 
-  igtl::Socket* fromSocket = data->fromSocket;
-  igtl::Socket* toSocket   = data->toSocket;
+  while (con->Active)
+    {
+    int r;
+    r = con->Process();
+    if (r == 1)
+      {
+      std::cerr << "Connection closed by the 'from' host." << std::endl;
+      con->Active = 0;
+      }
+    else if (r == 2)
+      {
+      std::cerr << "Connection closed by the 'to' host." << std::endl;
+      con->Active = 0;
+      }
+    }
+
+  con->Active = 0;
+}
+
+
+int Session::Process()
+{
+  // Return 0: Normal
+  // Return 1: Closed by the 'from' host
+  // Return 2: Closed by the 'to' host
+  // Return 3: Size error
 
   // Create a message buffer to receive header
   igtl::MessageHeader::Pointer headerMsg;
@@ -57,94 +146,90 @@ int SessionThread(void* ptr)
   igtl::TimeStamp::Pointer ts;
   ts = igtl::TimeStamp::New();
 
-  //------------------------------------------------------------
-  // loop
-  while(1)
+
+  // Initialize receive buffer
+  headerMsg->InitPack();
+
+  // Receive generic header from the socket
+  bool timeout(false);
+  igtlUint64 r = fromSocket->Receive(headerMsg->GetPackPointer(), headerMsg->GetPackSize(), timeout);
+  if (r == 0)
     {
-
-    // Initialize receive buffer
-    headerMsg->InitPack();
-
-    // Receive generic header from the socket
-    bool timeout(false);
-    igtlUint64 r = fromSocket->Receive(headerMsg->GetPackPointer(), headerMsg->GetPackSize(), timeout);
-    if (r == 0)
-      {
-      //fromSocket->CloseSocket();
-      return 1; // Connection closed
-      }
-
-    if (r != headerMsg->GetPackSize())
-      {
-      continue;
-      }
-
-    // Deserialize the header
-    headerMsg->Unpack();
-
-    // Get time stamp
-    igtlUint32 sec;
-    igtlUint32 nanosec;
-
-    headerMsg->GetTimeStamp(ts);
-    ts->GetTimeStamp(&sec, &nanosec);
-
-    std::cerr << "Time stamp: "
-              << sec << "." << std::setw(9) << std::setfill('0')
-              << nanosec << std::endl;
-
-    // Check data type and receive data body
-    if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
-      {
-      ReceiveTransform(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "POSITION") == 0)
-      {
-      ReceivePosition(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "IMAGE") == 0)
-      {
-      ReceiveImage(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "STATUS") == 0)
-      {
-      ReceiveStatus(fromSocket, toSocket, headerMsg);
-      }
-#if OpenIGTLink_PROTOCOL_VERSION >= 2
-    else if (strcmp(headerMsg->GetDeviceType(), "POINT") == 0)
-      {
-      ReceivePoint(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "TRAJ") == 0)
-      {
-      ReceiveTrajectory(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "STRING") == 0)
-      {
-      ReceiveString(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "BIND") == 0)
-      {
-      ReceiveBind(fromSocket, toSocket, headerMsg);
-      }
-    else if (strcmp(headerMsg->GetDeviceType(), "CAPABILITY") == 0)
-      {
-      ReceiveCapability(fromSocket, toSocket, headerMsg);
-      }
-#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
-    else
-      {
-      // if the data type is unknown, skip reading.
-      std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
-      std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
-      fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
-      }
+    //fromSocket->CloseSocket();
+    return 1; // Connection closed by the 'from' socekt
     }
+
+  if (r != headerMsg->GetPackSize())
+    {
+    return 3;
+    }
+
+  // Deserialize the header
+  headerMsg->Unpack();
+
+  // Get time stamp
+  igtlUint32 sec;
+  igtlUint32 nanosec;
+
+  headerMsg->GetTimeStamp(ts);
+  ts->GetTimeStamp(&sec, &nanosec);
+
+  std::cerr << "Time stamp: "
+            << sec << "." << std::setw(9) << std::setfill('0')
+            << nanosec << std::endl;
+
+  // Check data type and receive data body
+  if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
+    {
+    ReceiveTransform(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "POSITION") == 0)
+    {
+    ReceivePosition(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "IMAGE") == 0)
+    {
+    ReceiveImage(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "STATUS") == 0)
+    {
+    ReceiveStatus(headerMsg);
+    }
+#if OpenIGTLink_PROTOCOL_VERSION >= 2
+  else if (strcmp(headerMsg->GetDeviceType(), "POINT") == 0)
+    {
+    ReceivePoint(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "TRAJ") == 0)
+    {
+    ReceiveTrajectory(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "STRING") == 0)
+    {
+    ReceiveString(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "BIND") == 0)
+    {
+    ReceiveBind(headerMsg);
+    }
+  else if (strcmp(headerMsg->GetDeviceType(), "CAPABILITY") == 0)
+    {
+    ReceiveCapability(headerMsg);
+    }
+#endif //OpenIGTLink_PROTOCOL_VERSION >= 2
+  else
+    {
+    // if the data type is unknown, skip reading.
+    std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
+    std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
+    fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
+    }
+
+  return 0;
 }
 
 
-
-int ReceiveTransform(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveTransform(igtl::MessageHeader * header)
 {
   std::cerr << "Receiving TRANSFORM data type." << std::endl;
 
@@ -156,7 +241,7 @@ int ReceiveTransform(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::M
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(transMsg->GetPackBodyPointer(), transMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(transMsg->GetPackBodyPointer(), transMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -181,7 +266,7 @@ int ReceiveTransform(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::M
 }
 
 
-int ReceivePosition(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceivePosition(igtl::MessageHeader * header)
 {
   std::cerr << "Receiving POSITION data type." << std::endl;
 
@@ -193,7 +278,7 @@ int ReceivePosition(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Me
 
   // Receive position position data from the socket
   bool timeout(false);
-  fromSocket->Receive(positionMsg->GetPackBodyPointer(), positionMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(positionMsg->GetPackBodyPointer(), positionMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -223,7 +308,7 @@ int ReceivePosition(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Me
 }
 
 
-int ReceiveImage(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveImage(igtl::MessageHeader * header)
 {
   std::cerr << "Receiving IMAGE data type." << std::endl;
 
@@ -235,7 +320,7 @@ int ReceiveImage(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messa
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(imgMsg->GetPackBodyPointer(), imgMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(imgMsg->GetPackBodyPointer(), imgMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -280,7 +365,7 @@ int ReceiveImage(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messa
 }
 
 
-int ReceiveStatus(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveStatus(igtl::MessageHeader * header)
 {
 
   std::cerr << "Receiving STATUS data type." << std::endl;
@@ -293,7 +378,7 @@ int ReceiveStatus(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Mess
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(statusMsg->GetPackBodyPointer(), statusMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(statusMsg->GetPackBodyPointer(), statusMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -319,7 +404,7 @@ int ReceiveStatus(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Mess
 
 
 #if OpenIGTLink_PROTOCOL_VERSION >= 2
-int ReceivePoint(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceivePoint(igtl::MessageHeader * header)
 {
 
   std::cerr << "Receiving POINT data type." << std::endl;
@@ -332,7 +417,7 @@ int ReceivePoint(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messa
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(pointMsg->GetPackBodyPointer(), pointMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(pointMsg->GetPackBodyPointer(), pointMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -370,7 +455,7 @@ int ReceivePoint(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messa
   return 1;
 }
 
-int ReceiveTrajectory(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader::Pointer& header)
+int Session::ReceiveTrajectory(igtl::MessageHeader::Pointer& header)
 {
 
   std::cerr << "Receiving TRAJECTORY data type." << std::endl;
@@ -383,7 +468,7 @@ int ReceiveTrajectory(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(trajectoryMsg->GetPackBodyPointer(), trajectoryMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(trajectoryMsg->GetPackBodyPointer(), trajectoryMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -425,7 +510,7 @@ int ReceiveTrajectory(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::
 }
 
 
-int ReceiveString(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveString(igtl::MessageHeader * header)
 {
 
   std::cerr << "Receiving STRING data type." << std::endl;
@@ -438,7 +523,7 @@ int ReceiveString(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Mess
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(stringMsg->GetPackBodyPointer(), stringMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(stringMsg->GetPackBodyPointer(), stringMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -450,7 +535,7 @@ int ReceiveString(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Mess
               << "String: " << stringMsg->GetString() << std::endl;
 
     stringMsg->Pack();
-    toSocket->Send(stringMsg->GetPackPointer(), stringMsg->GetPackSize());
+    this->toSocket->Send(stringMsg->GetPackPointer(), stringMsg->GetPackSize());
 
     }
 
@@ -458,7 +543,7 @@ int ReceiveString(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Mess
 }
 
 
-int ReceiveBind(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveBind(igtl::MessageHeader * header)
 {
 
   std::cerr << "Receiving BIND data type." << std::endl;
@@ -471,7 +556,7 @@ int ReceiveBind(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messag
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(bindMsg->GetPackBodyPointer(), bindMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(bindMsg->GetPackBodyPointer(), bindMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -509,7 +594,7 @@ int ReceiveBind(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messag
       }
 
     bindMsg->Pack();
-    toSocket->Send(bindMsg->GetPackPointer(), bindMsg->GetPackSize());
+    this->toSocket->Send(bindMsg->GetPackPointer(), bindMsg->GetPackSize());
 
     }
 
@@ -517,7 +602,7 @@ int ReceiveBind(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::Messag
 }
 
 
-int ReceiveCapability(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::MessageHeader * header)
+int Session::ReceiveCapability(igtl::MessageHeader * header)
 {
 
   std::cerr << "Receiving CAPABILITY data type." << std::endl;
@@ -530,7 +615,7 @@ int ReceiveCapability(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::
 
   // Receive transform data from the socket
   bool timeout(false);
-  fromSocket->Receive(capabilMsg->GetPackBodyPointer(), capabilMsg->GetPackBodySize(), timeout);
+  this->fromSocket->Receive(capabilMsg->GetPackBodyPointer(), capabilMsg->GetPackBodySize(), timeout);
 
   // Deserialize the transform data
   // If you want to skip CRC check, call Unpack() without argument.
@@ -545,7 +630,7 @@ int ReceiveCapability(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::
       }
 
     capabilMsg->Pack();
-    toSocket->Send(capabilMsg->GetPackPointer(), capabilMsg->GetPackSize());
+    this->toSocket->Send(capabilMsg->GetPackPointer(), capabilMsg->GetPackSize());
 
     }
 
@@ -555,3 +640,5 @@ int ReceiveCapability(igtl::Socket * fromSocket, igtl::Socket * toSocket, igtl::
 
 
 #endif //OpenIGTLink_PROTOCOL_VERSION >= 2
+
+} // End of igtl namespace
