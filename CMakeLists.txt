@@ -13,14 +13,8 @@ set(igtlRepeater_SOURCES
   session.cxx
   )
 
-ADD_EXECUTABLE(RepeaterServer
+ADD_EXECUTABLE(igtlrepeater
   ${igtlRepeater_SOURCES}
-  server.cxx
+  main.cxx
   )
-TARGET_LINK_LIBRARIES(RepeaterServer OpenIGTLink)
-
-ADD_EXECUTABLE(RepeaterClient
-  ${igtlRepeater_SOURCES}
-  client.cxx
-  )
-TARGET_LINK_LIBRARIES(RepeaterClient OpenIGTLink)
+TARGET_LINK_LIBRARIES(igtlrepeater OpenIGTLink)
