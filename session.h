@@ -5,6 +5,7 @@
 #include "igtlMultiThreader.h"
 #include "igtlMutexLock.h"
 #include "igtlMessageHeader.h"
+#include "logger.h"
 
 namespace igtl
 {
@@ -37,6 +38,16 @@ public:
     this->toLock   = to;
   };
 
+  void SetLogger(igtl::Logger * logger)
+  {
+    this->logger = logger;
+  };
+
+  void SetName(const char * name)
+  {
+    this->Name = name;
+  };
+
   static void    MonitorThreadFunction(void * ptr);
 
 protected:
@@ -66,12 +77,16 @@ protected:
 
   int            Active;  // 0: Not active; 1: Active; -1: exiting
 
+  std::string    Name;
+
   igtl::MultiThreader::Pointer Threader;
 
   igtl::Socket * fromSocket;
   igtl::Socket * toSocket;
   igtl::MutexLock * fromLock;
   igtl::MutexLock * toLock;
+
+  igtl::Logger * logger;
 
   int id;
   int nThread;

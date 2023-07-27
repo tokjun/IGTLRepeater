@@ -37,7 +37,7 @@ public:
 
   virtual const char * GetClassName() { return "Base"; };
 
-  void Print(std::string& msg);
+  void Print(const std::string& msg);
 
 protected:
 

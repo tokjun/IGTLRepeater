@@ -85,6 +85,7 @@ int main(int argc, char* argv[])
       ServerSession(socket, dest_hostname, dest_port);
       //------------------------------------------------------------
       // Close connection (The example code never reaches to this section ...)
+      std::cerr << "Closing the server socket." << std::endl;
       socket->CloseSocket();
       }
     }
@@ -111,11 +112,17 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
   igtl::MutexLock::Pointer clientLock = igtl::MutexLock::New();
   igtl::MutexLock::Pointer serverLock = igtl::MutexLock::New();
 
+  igtl::Logger::Pointer logger = igtl::Logger::New();
+
   sessionUp->SetSockets(clientSocket, serverSocket);
   sessionUp->SetMutexLocks(clientLock, serverLock);
+  sessionUp->SetLogger(logger);
+  sessionUp->SetName("C->S");
 
   sessionDown->SetSockets(serverSocket, clientSocket);
   sessionDown->SetMutexLocks(serverLock, clientLock);
+  sessionDown->SetLogger(logger);
+  sessionDown->SetName("S->C");
 
   sessionUp->Start();
   sessionDown->Start();
@@ -123,20 +130,13 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
   // Monitor
   while(sessionUp->IsActive() && sessionDown->IsActive())
     {
-    std::cerr << "Alive!" << std::endl;
     igtl::Sleep(500);
     }
 
-  //threader->TerminateThread(tdup.threadID);
-  //threader->TerminateThread(idup);
-  //threader->TerminateThread(tddown.threadID);
-  //threader->TerminateThread(iddown);
-  //
   sessionUp->Stop();
   sessionDown->Stop();
 
-  //------------------------------------------------------------
-  // Close connection (The example code never reaches this section ...)
+  std::cerr << "Closing the client socket." << std::endl;
 
   clientSocket->CloseSocket();
 

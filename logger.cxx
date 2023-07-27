@@ -36,10 +36,10 @@ Logger::~Logger()
 {
 }
 
-void Logger::Print(std::string& msg)
+void Logger::Print(const std::string& msg)
 {
   this->Mutex->Lock();
-  std::cout << msg << std::endl;
+  std::cout << msg;
   this->Mutex->Unlock();
 }
 

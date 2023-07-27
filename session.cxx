@@ -43,6 +43,8 @@ Session::Session()
   this->toSocket = NULL;
   this->fromLock = NULL;
   this->toLock = NULL;
+
+  this->logger = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -79,6 +81,12 @@ int Session::Start()
   if (!this->toLock)
     {
     std::cerr << "ERROR: no 'to' lock" << std::endl;
+    return 0;
+    }
+
+  if (!this->logger)
+    {
+    std::cerr << "ERROR: no logger" << std::endl;
     return 0;
     }
 
@@ -174,9 +182,11 @@ int Session::Process()
   headerMsg->GetTimeStamp(ts);
   ts->GetTimeStamp(&sec, &nanosec);
 
-  std::cerr << "Time stamp: "
-            << sec << "." << std::setw(9) << std::setfill('0')
-            << nanosec << std::endl;
+  std::stringstream ss;
+  ss << this->Name << ", " << sec << "." << std::setw(9) << std::setfill('0') << nanosec
+     << ", " << headerMsg->GetDeviceName() << ", " << headerMsg->GetDeviceType();
+
+  this->logger->Print(ss.str());
 
   // Check data type and receive data body
   if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
@@ -220,8 +230,8 @@ int Session::Process()
   else
     {
     // if the data type is unknown, skip reading.
-    std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
-    std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
+    //std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
+    //std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
     fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
     }
 
@@ -231,8 +241,6 @@ int Session::Process()
 
 int Session::ReceiveTransform(igtl::MessageHeader * header)
 {
-  std::cerr << "Receiving TRANSFORM data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::TransformMessage::Pointer transMsg;
   transMsg = igtl::TransformMessage::New();
@@ -249,11 +257,19 @@ int Session::ReceiveTransform(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
+    std::stringstream ss;
+
     // Retrive the transform data
     igtl::Matrix4x4 matrix;
     transMsg->GetMatrix(matrix);
-    igtl::PrintMatrix(matrix);
+    //igtl::PrintMatrix(matrix);
+    ss << "Matrix=("
+       << matrix[0][0] << ", " << matrix[1][0] << ", " << matrix[2][0] << ", " << matrix[3][0] << ", "
+       << matrix[0][1] << ", " << matrix[1][1] << ", " << matrix[2][1] << ", " << matrix[3][1] << ", "
+       << matrix[0][2] << ", " << matrix[1][2] << ", " << matrix[2][2] << ", " << matrix[3][2] << ", "
+       << matrix[0][3] << ", " << matrix[1][3] << ", " << matrix[2][3] << ", " << matrix[3][3] << ")" << std::endl;
 
+    this->logger->Print(ss.str());
     transMsg->Pack();
     toSocket->Send(transMsg->GetPackPointer(), transMsg->GetPackSize());
 
@@ -268,8 +284,6 @@ int Session::ReceiveTransform(igtl::MessageHeader * header)
 
 int Session::ReceivePosition(igtl::MessageHeader * header)
 {
-  std::cerr << "Receiving POSITION data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::PositionMessage::Pointer positionMsg;
   positionMsg = igtl::PositionMessage::New();
@@ -293,10 +307,11 @@ int Session::ReceivePosition(igtl::MessageHeader * header)
     positionMsg->GetPosition(position);
     positionMsg->GetQuaternion(quaternion);
 
-    std::cerr << "position   = (" << position[0] << ", " << position[1] << ", " << position[2] << ")" << std::endl;
-    std::cerr << "quaternion = (" << quaternion[0] << ", " << quaternion[1] << ", "
-              << quaternion[2] << ", " << quaternion[3] << ")" << std::endl << std::endl;
+    std::stringstream ss;
+    ss << "position=(" << position[0] << ", " << position[1] << ", " << position[2] << "),"
+       << "quaternion=(" << quaternion[0] << ", " << quaternion[1] << ", " << quaternion[2] << ", " << quaternion[3] << ")" << std::endl;
 
+    this->logger->Print(ss.str());
     positionMsg->Pack();
     toSocket->Send(positionMsg->GetPackPointer(), positionMsg->GetPackSize());
 
@@ -310,8 +325,6 @@ int Session::ReceivePosition(igtl::MessageHeader * header)
 
 int Session::ReceiveImage(igtl::MessageHeader * header)
 {
-  std::cerr << "Receiving IMAGE data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::ImageMessage::Pointer imgMsg;
   imgMsg = igtl::ImageMessage::New();
@@ -342,17 +355,14 @@ int Session::ReceiveImage(igtl::MessageHeader * header)
     imgMsg->GetSpacing(spacing);
     imgMsg->GetSubVolume(svsize, svoffset);
 
-    std::cerr << "Device Name           : " << imgMsg->GetDeviceName() << std::endl;
-    std::cerr << "Scalar Type           : " << scalarType << std::endl;
-    std::cerr << "Endian                : " << endian << std::endl;
-    std::cerr << "Dimensions            : ("
-              << size[0] << ", " << size[1] << ", " << size[2] << ")" << std::endl;
-    std::cerr << "Spacing               : ("
-              << spacing[0] << ", " << spacing[1] << ", " << spacing[2] << ")" << std::endl;
-    std::cerr << "Sub-Volume dimensions : ("
-              << svsize[0] << ", " << svsize[1] << ", " << svsize[2] << ")" << std::endl;
-    std::cerr << "Sub-Volume offset     : ("
-              << svoffset[0] << ", " << svoffset[1] << ", " << svoffset[2] << ")" << std::endl;
+    std::stringstream ss;
+    ss << "Endian=" << endian << ", "
+       << "Dimensions=("
+       << size[0] << ", " << size[1] << ", " << size[2] << "), "
+       << "Spacing=(" << spacing[0] << ", " << spacing[1] << ", " << spacing[2] << "), "
+       << "SubVolumeDimension=(" << svsize[0] << ", " << svsize[1] << ", " << svsize[2] << "), "
+       << "SubVolumeOffset=(" << svoffset[0] << ", " << svoffset[1] << ", " << svoffset[2] << ")" << std::endl;
+    this->logger->Print(ss.str());
 
     imgMsg->Pack();
     toSocket->Send(imgMsg->GetPackPointer(), imgMsg->GetPackSize());
@@ -367,9 +377,6 @@ int Session::ReceiveImage(igtl::MessageHeader * header)
 
 int Session::ReceiveStatus(igtl::MessageHeader * header)
 {
-
-  std::cerr << "Receiving STATUS data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::StatusMessage::Pointer statusMsg;
   statusMsg = igtl::StatusMessage::New();
@@ -386,12 +393,14 @@ int Session::ReceiveStatus(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    std::cerr << "========== STATUS ==========" << std::endl;
-    std::cerr << " Code      : " << statusMsg->GetCode() << std::endl;
-    std::cerr << " SubCode   : " << statusMsg->GetSubCode() << std::endl;
-    std::cerr << " Error Name: " << statusMsg->GetErrorName() << std::endl;
-    std::cerr << " Status    : " << statusMsg->GetStatusString() << std::endl;
-    std::cerr << "============================" << std::endl;
+    std::stringstream ss;
+
+    ss << "Code=" << statusMsg->GetCode() << ", "
+       << "SubCode=" << statusMsg->GetSubCode() << ", "
+       << "ErrorName=" << statusMsg->GetErrorName() << ", "
+       << "Status=" << statusMsg->GetStatusString() << std::endl;
+
+    this->logger->Print(ss.str());
 
     statusMsg->Pack();
     toSocket->Send(statusMsg->GetPackPointer(), statusMsg->GetPackSize());
@@ -406,9 +415,6 @@ int Session::ReceiveStatus(igtl::MessageHeader * header)
 #if OpenIGTLink_PROTOCOL_VERSION >= 2
 int Session::ReceivePoint(igtl::MessageHeader * header)
 {
-
-  std::cerr << "Receiving POINT data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::PointMessage::Pointer pointMsg;
   pointMsg = igtl::PointMessage::New();
@@ -425,6 +431,8 @@ int Session::ReceivePoint(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
+    std::stringstream ss;
+
     int nElements = pointMsg->GetNumberOfPointElement();
     for (int i = 0; i < nElements; i ++)
       {
@@ -437,15 +445,16 @@ int Session::ReceivePoint(igtl::MessageHeader * header)
       igtlFloat32 pos[3];
       pointElement->GetPosition(pos);
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name      : " << pointElement->GetName() << std::endl;
-      std::cerr << " GroupName : " << pointElement->GetGroupName() << std::endl;
-      std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
-      std::cerr << " Position  : ( " << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << " )" << std::endl;
-      std::cerr << " Radius    : " << std::fixed << pointElement->GetRadius() << std::endl;
-      std::cerr << " Owner     : " << pointElement->GetOwner() << std::endl;
-      std::cerr << "================================" << std::endl;
+      ss << "Element=" << i << ", "
+         << "Name=" << pointElement->GetName() << ", "
+         << "GroupName=" << pointElement->GetGroupName() << ", "
+         << "RGBA=( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << "), "
+         << "Position=(" << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << "), "
+         << "Radius=" << std::fixed << pointElement->GetRadius() << ", "
+         << "Owner=" << pointElement->GetOwner() << ", ";
       }
+    ss << std::endl;
+    this->logger->Print(ss.str());
 
     pointMsg->Pack();
     toSocket->Send(pointMsg->GetPackPointer(), pointMsg->GetPackSize());
@@ -457,9 +466,6 @@ int Session::ReceivePoint(igtl::MessageHeader * header)
 
 int Session::ReceiveTrajectory(igtl::MessageHeader::Pointer& header)
 {
-
-  std::cerr << "Receiving TRAJECTORY data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::TrajectoryMessage::Pointer trajectoryMsg;
   trajectoryMsg = igtl::TrajectoryMessage::New();
@@ -476,6 +482,8 @@ int Session::ReceiveTrajectory(igtl::MessageHeader::Pointer& header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
+    std::stringstream ss;
+
     int nElements = trajectoryMsg->GetNumberOfTrajectoryElement();
     for (int i = 0; i < nElements; i ++)
       {
@@ -490,16 +498,17 @@ int Session::ReceiveTrajectory(igtl::MessageHeader::Pointer& header)
       trajectoryElement->GetEntryPosition(entry);
       trajectoryElement->GetTargetPosition(target);
 
-      std::cerr << "========== Element #" << i << " ==========" << std::endl;
-      std::cerr << " Name      : " << trajectoryElement->GetName() << std::endl;
-      std::cerr << " GroupName : " << trajectoryElement->GetGroupName() << std::endl;
-      std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
-      std::cerr << " Entry Pt  : ( " << std::fixed << entry[0] << ", " << entry[1] << ", " << entry[2] << " )" << std::endl;
-      std::cerr << " Target Pt : ( " << std::fixed << target[0] << ", " << target[1] << ", " << target[2] << " )" << std::endl;
-      std::cerr << " Radius    : " << std::fixed << trajectoryElement->GetRadius() << std::endl;
-      std::cerr << " Owner     : " << trajectoryElement->GetOwner() << std::endl;
-      std::cerr << "================================" << std::endl << std::endl;
+      ss << "Element #" << i << ", "
+         << "Name=" << trajectoryElement->GetName() << ", "
+         << "GroupName=" << trajectoryElement->GetGroupName() << ", "
+         << "RGBA=( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << ", "
+         << "EntryPt=( " << std::fixed << entry[0] << ", " << entry[1] << ", " << entry[2] << " )" << ", "
+         << "TargetPt=( " << std::fixed << target[0] << ", " << target[1] << ", " << target[2] << " )" << ", "
+         << "Radius=" << std::fixed << trajectoryElement->GetRadius() << ", "
+         << "Owner=" << trajectoryElement->GetOwner() << ", ";
       }
+    ss << std::endl;
+    this->logger->Print(ss.str());
 
     trajectoryMsg->Pack();
     toSocket->Send(trajectoryMsg->GetPackPointer(), trajectoryMsg->GetPackSize());
@@ -512,8 +521,6 @@ int Session::ReceiveTrajectory(igtl::MessageHeader::Pointer& header)
 
 int Session::ReceiveString(igtl::MessageHeader * header)
 {
-
-  std::cerr << "Receiving STRING data type." << std::endl;
 
   // Create a message buffer to receive transform data
   igtl::StringMessage::Pointer stringMsg;
@@ -531,8 +538,12 @@ int Session::ReceiveString(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
-    std::cerr << "Encoding: " << stringMsg->GetEncoding() << "; "
-              << "String: " << stringMsg->GetString() << std::endl;
+    std::stringstream ss;
+
+    ss << "Encoding=" << stringMsg->GetEncoding() << ", "
+       << "String=" << stringMsg->GetString() << std::endl;
+
+    this->logger->Print(ss.str());
 
     stringMsg->Pack();
     this->toSocket->Send(stringMsg->GetPackPointer(), stringMsg->GetPackSize());
@@ -545,9 +556,6 @@ int Session::ReceiveString(igtl::MessageHeader * header)
 
 int Session::ReceiveBind(igtl::MessageHeader * header)
 {
-
-  std::cerr << "Receiving BIND data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::BindMessage::Pointer bindMsg;
   bindMsg = igtl::BindMessage::New();
@@ -564,6 +572,8 @@ int Session::ReceiveBind(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
+    std::stringstream ss;
+
     int n = bindMsg->GetNumberOfChildMessages();
 
     for (int i = 0; i < n; i ++)
@@ -574,10 +584,10 @@ int Session::ReceiveBind(igtl::MessageHeader * header)
         stringMsg = igtl::StringMessage::New();
         bindMsg->GetChildMessage(i, stringMsg);
         stringMsg->Unpack(0);
-        std::cerr << "Message type: STRING" << std::endl;
-        std::cerr << "Message name: " << stringMsg->GetDeviceName() << std::endl;
-        std::cerr << "Encoding: " << stringMsg->GetEncoding() << "; "
-                  << "String: " << stringMsg->GetString() << std::endl;
+        ss << "MessageType=STRING,"
+           << "MessageNname=" << stringMsg->GetDeviceName() << ", "
+           << "Encoding=" << stringMsg->GetEncoding() << ", "
+           << "String=" << stringMsg->GetString() << ", ";
         }
       else if (strcmp(bindMsg->GetChildMessageType(i), "TRANSFORM") == 0)
         {
@@ -585,14 +595,21 @@ int Session::ReceiveBind(igtl::MessageHeader * header)
         transMsg = igtl::TransformMessage::New();
         bindMsg->GetChildMessage(i, transMsg);
         transMsg->Unpack(0);
-        std::cerr << "Message type: TRANSFORM" << std::endl;
-        std::cerr << "Message name: " << transMsg->GetDeviceName() << std::endl;
+        ss << "MessageType=TRANSFORM,"
+           << "MessageName=" << transMsg->GetDeviceName() << ", ";
         igtl::Matrix4x4 matrix;
         transMsg->GetMatrix(matrix);
-        igtl::PrintMatrix(matrix);
+        //igtl::PrintMatrix(matrix);
+        ss << "Matrix=("
+           << matrix[0][0] << ", " << matrix[1][0] << ", " << matrix[2][0] << ", " << matrix[3][0] << ", "
+           << matrix[0][1] << ", " << matrix[1][1] << ", " << matrix[2][1] << ", " << matrix[3][1] << ", "
+           << matrix[0][2] << ", " << matrix[1][2] << ", " << matrix[2][2] << ", " << matrix[3][2] << ", "
+           << matrix[0][3] << ", " << matrix[1][3] << ", " << matrix[2][3] << ", " << matrix[3][3] << "),";
         }
       }
 
+    ss << std::endl;
+    this->logger->Print(ss.str());
     bindMsg->Pack();
     this->toSocket->Send(bindMsg->GetPackPointer(), bindMsg->GetPackSize());
 
@@ -604,9 +621,6 @@ int Session::ReceiveBind(igtl::MessageHeader * header)
 
 int Session::ReceiveCapability(igtl::MessageHeader * header)
 {
-
-  std::cerr << "Receiving CAPABILITY data type." << std::endl;
-
   // Create a message buffer to receive transform data
   igtl::CapabilityMessage::Pointer capabilMsg;
   capabilMsg = igtl::CapabilityMessage::New();
@@ -623,12 +637,17 @@ int Session::ReceiveCapability(igtl::MessageHeader * header)
 
   if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
     {
+    std::stringstream ss;
+
     int nTypes = capabilMsg->GetNumberOfTypes();
     for (int i = 0; i < nTypes; i ++)
       {
-      std::cerr << "Typename #" << i << ": " << capabilMsg->GetType(i) << std::endl;
+      ss << "ID=" << i << ", "
+         << "TYPE=" << capabilMsg->GetType(i) << ", ";
       }
 
+    ss << std::endl;
+    this->logger->Print(ss.str());
     capabilMsg->Pack();
     this->toSocket->Send(capabilMsg->GetPackPointer(), capabilMsg->GetPackSize());
 
