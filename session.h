@@ -70,6 +70,7 @@ protected:
   int ReceiveString(igtl::MessageHeader * header);
   int ReceiveBind(igtl::MessageHeader * header);
   int ReceiveCapability(igtl::MessageHeader * header);
+  int ReceiveTrackingData(igtl::MessageHeader::Pointer& header);
 #endif //OpenIGTLink_PROTOCOL_VERSION >= 2
 
 

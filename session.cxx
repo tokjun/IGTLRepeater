@@ -27,6 +27,7 @@
 #include "igtlTrackingDataMessage.h"
 #include "igtlQuaternionTrackingDataMessage.h"
 #include "igtlCapabilityMessage.h"
+#include "igtlTrackingDataMessage.h"
 #endif // OpenIGTLink_PROTOCOL_VERSION >= 2
 
 
@@ -162,6 +163,8 @@ int Session::Process()
 
   // Receive generic header from the socket
   bool timeout(false);
+  int headerLength = headerMsg->GetPackSize();
+
   igtlUint64 r = fromSocket->Receive(headerMsg->GetPackPointer(), headerMsg->GetPackSize(), timeout);
   if (r == 0)
     {
@@ -172,6 +175,16 @@ int Session::Process()
   if (r != headerMsg->GetPackSize())
     {
     return 3;
+    }
+
+  unsigned char dummy[256];
+  if (headerLength < 256)
+    {
+    memcpy(dummy, headerMsg->GetPackPointer(), headerLength);
+    }
+  else
+    {
+    std::cerr << "Large header" << std::endl;
     }
 
   // Deserialize the header
@@ -235,13 +248,42 @@ int Session::Process()
     {
     ReceiveCapability(headerMsg);
     }
+  else if (strcmp(headerMsg->GetDeviceType(), "TDATA") == 0)
+    {
+    ReceiveTrackingData(headerMsg);
+    }
 #endif //OpenIGTLink_PROTOCOL_VERSION >= 2
   else
     {
     // if the data type is unknown, skip reading.
     //std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
     //std::cerr << "Size : " << headerMsg->GetBodySizeToRead() << std::endl;
-    fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
+    //
+    toSocket->Send(dummy, headerLength);
+
+    //fromSocket->Skip(headerMsg->GetBodySizeToRead(), 0);
+    igtlUint64 remain = headerMsg->GetBodySizeToRead();
+    igtlUint64 block  = 256;
+    igtlUint64 n = 0;
+
+    do
+      {
+      if (remain < block)
+        {
+        block = remain;
+        }
+
+      bool timeout(false);
+      n = fromSocket->Receive(dummy, block, timeout, 0);
+      toSocket->Send(dummy, n);
+      if (n <= 0)
+        {
+        break;
+        }
+      remain -= n;
+      }
+    while (remain > 0);
+
     std::stringstream ss;
     ss << std::endl;
     this->logger->Print(ss.str());
@@ -668,6 +710,59 @@ int Session::ReceiveCapability(igtl::MessageHeader * header)
   return 1;
 
 }
+
+int Session::ReceiveTrackingData(igtl::MessageHeader::Pointer& header)
+{
+  //------------------------------------------------------------
+  // Allocate TrackingData Message Class
+
+  igtl::TrackingDataMessage::Pointer trackingData;
+  trackingData = igtl::TrackingDataMessage::New();
+  trackingData->SetMessageHeader(header);
+  trackingData->AllocatePack();
+
+  // Receive body from the socket
+  bool timeout(false);
+  fromSocket->Receive(trackingData->GetPackBodyPointer(), trackingData->GetPackBodySize(), timeout);
+
+  // Deserialize the transform data
+  // If you want to skip CRC check, call Unpack() without argument.
+  int c = trackingData->Unpack(1);
+
+  if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
+    {
+    std::stringstream ss;
+
+    int nElements = trackingData->GetNumberOfTrackingDataElements();
+    for (int i = 0; i < nElements; i ++)
+      {
+      igtl::TrackingDataElement::Pointer trackingElement;
+      trackingData->GetTrackingDataElement(i, trackingElement);
+
+      igtl::Matrix4x4 matrix;
+      trackingElement->GetMatrix(matrix);
+
+      ss << "ElementID=" << i << ", "
+         << "Name=" << trackingElement->GetName() << ", "
+         << "Type=" << (int) trackingElement->GetType() << ", ";
+
+      ss << "Matrix=("
+         << matrix[0][0] << ", " << matrix[1][0] << ", " << matrix[2][0] << ", " << matrix[3][0] << ", "
+         << matrix[0][1] << ", " << matrix[1][1] << ", " << matrix[2][1] << ", " << matrix[3][1] << ", "
+         << matrix[0][2] << ", " << matrix[1][2] << ", " << matrix[2][2] << ", " << matrix[3][2] << ", "
+         << matrix[0][3] << ", " << matrix[1][3] << ", " << matrix[2][3] << ", " << matrix[3][3] << "),";
+      }
+
+    ss << std::endl;
+    this->logger->Print(ss.str());
+    trackingData->Pack();
+    this->toSocket->Send(trackingData->GetPackPointer(), trackingData->GetPackSize());
+
+    }
+
+  return 1;
+}
+
 
 
 #endif //OpenIGTLink_PROTOCOL_VERSION >= 2
