@@ -12,7 +12,7 @@ The IGTLRepeater (in principle) works on Linux, Mac, and Windows. To build the s
 
 ### OpenIGTLink
 
-The OpenIGTLink library must be built on the computer before comiling the IGTLRepeater. To install the OpenIGTLink library:
+The OpenIGTLink library must be built on the computer before compiling the IGTLRepeater. To install the OpenIGTLink library:
 
 ~~~~
 $ cd <working directory>
@@ -20,7 +20,7 @@ $ git clone https://github.com/openigtlink/OpenIGTLink
 $ mkdir OpenIGTLink-build
 ~~~~
 
-You can configure the source code with CMake, from either CMake GUI or `ccmake` interface, or using the `cmake` command. The library can be compiled with the default parameters, though using the `Release` mode could improve the performance. If you are using either CMake GUI or ccamek interface,
+You can configure the source code with CMake, from either CMake GUI or `ccmake` interface or using the `cmake` command. The library can be compiled with the default parameters, though `Release` mode could improve the performance. If you are using either CMake GUI or `ccmake`` interface,
 
 
 | Where is the source code    | <working directory>/OpenIGTLink       |
@@ -36,7 +36,7 @@ You can configure the source code with CMake, from either CMake GUI or `ccmake` 
 
 then, click `Configure` followed by `Generate`.
 
-If you are configuring with the `cmake` commmand:
+If you are configuring with the `cmake` command:
 
 ~~~~
 $ cd OpenIGTLink-build
@@ -48,7 +48,7 @@ Once the source code has been configured, run `make` (or build from Visual Studi
 
 ### IGTLRepeater
 
-Similarly, IGTLRepeater can be configured with CMake, and then built with the C++ compalier.
+Similarly, IGTLRepeater can be configured with CMake, and then built with the C++ compiler.
 
 ~~~~
 $ cd <working directory>
@@ -104,7 +104,7 @@ First, Open a terminal on the relay host, and run the following command to start
 $ igtlrepeater 192.168.0.4 18944 18944
 ~~~~
 
-Note that the first argument (`192.168.0.4`) is the IP or hostname of the server host. The second and third arguments (`18944` and `18945`) are the port numbers for the server host and the relay host, respectively. The port numbers can be the same, unless the relay and server hosts share a same port number.
+Note that the first argument (`192.168.0.4`) is the IP or hostname of the server host. The second and third arguments (`18944` and `18945`) are the port numbers for the server host and the relay host, respectively. The port numbers can be the same unless the relay and server hosts share the same port number.
 
 Once the repeater has started, connect the client host to the server host using the IP and port number configured for the relay host. (`192.168.0.3` and `18945`, instead of `192.168.0.4` and `18944`.)
 
@@ -118,7 +118,7 @@ S->C, 1690476969.616718000, 0.000000000, LinearTransform_1, TRANSFORM, Matrix=(0
 S->C, 1690476969.628399000, 0.000000000, LinearTransform_1, TRANSFORM, Matrix=(0.984808, 0, 0.173648, 0, 0, 1, 0, 0, -0.173648, 0, 0.984808, 0, 23.6354, 12
 ~~~~
 
-Each line represents one OpenIGTLink message transferred from either the server or the client and is formatted in the CVS format. The first column (`C->S` or `S->C`) indicates the direction of the message, either 'Client to Server (C->S)' or 'Server to Client (S->C)'. The numbers in the second and thrid columns are the time stamps based on the system clock and the message header, respectively. The strings in the forth and fifth columns are the message name and the message type, respcetively. The rest of the line shows the content of the message, and the format depends on the message type.
+Each line represents one OpenIGTLink message transferred from either the server or the client and is formatted in the CVS format. The first column (`C->S` or `S->C`) indicates the direction of the message, either 'Client to Server (C->S)' or 'Server to Client (S->C)'. The numbers in the second and third columns are the time stamps based on the system clock and the message header, respectively. The strings in the fourth and fifth columns are the message name and the message type, respectively. The rest of the line shows the content of the message, and the format depends on the message type.
 
 
 ## Blocking messages
