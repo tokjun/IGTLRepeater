@@ -266,6 +266,18 @@ int Session::Process()
     igtlUint64 block  = 256;
     igtlUint64 n = 0;
 
+    std::cerr << "Unrecognized data type: " << headerMsg->GetDeviceType() << std::endl;
+    std::cerr << "Size: " << remain << std::endl;
+    std::cerr << "Content: " << std::endl;
+    for (int i = 0; i < remain; i ++)
+      {
+      std::cerr << std::hex << std::setw(2) << std::setfill('0') << (int)dummy[i] << " ";
+      if (i % 16 == 15)
+        {
+        std::cerr << std::endl;
+        }
+      }
+
     do
       {
       if (remain < block)
@@ -751,13 +763,17 @@ int Session::ReceiveTrackingData(igtl::MessageHeader::Pointer& header)
          << matrix[0][1] << ", " << matrix[1][1] << ", " << matrix[2][1] << ", " << matrix[3][1] << ", "
          << matrix[0][2] << ", " << matrix[1][2] << ", " << matrix[2][2] << ", " << matrix[3][2] << ", "
          << matrix[0][3] << ", " << matrix[1][3] << ", " << matrix[2][3] << ", " << matrix[3][3] << "),";
+
       }
 
     ss << std::endl;
     this->logger->Print(ss.str());
     trackingData->Pack();
     this->toSocket->Send(trackingData->GetPackPointer(), trackingData->GetPackSize());
-
+    }
+  else
+    {
+    this->logger->Print("Invalid TrackingData message.");
     }
 
   return 1;

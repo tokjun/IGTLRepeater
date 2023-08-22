@@ -139,7 +139,6 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
   sessionDown->Stop();
 
   std::cerr << "Closing the client socket." << std::endl;
-
   clientSocket->CloseSocket();
 
 }
