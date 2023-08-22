@@ -22,18 +22,17 @@ $ mkdir OpenIGTLink-build
 
 You can configure the source code with CMake, from either CMake GUI or `ccmake` interface, or using the `cmake` command. The library can be compiled with the default parameters, though using the `Release` mode could improve the performance. If you are using either CMake GUI or ccamek interface,
 
-|-----------------------------|---------------------------------------|
+
 | Where is the source code    | <working directory>/OpenIGTLink       |
 |-----------------------------|---------------------------------------|
 | Where to build the binaries | <working directory>/OpenIGTLink-build |
-|-----------------------------|---------------------------------------|
 
 
-|------------------|-------------------------------|
+
+
 | Name             | Value                         |
 |------------------|-------------------------------|
 | CMAKE_BUILD_TYPE | Release                       |
-|------------------|-------------------------------|
 
 then, click `Configure` followed by `Generate`.
 
@@ -59,18 +58,17 @@ $ mkdir IGTLRepeater-build
 
 If using CMake GUI or `ccmake`, 
 
-|-----------------------------|----------------------------------------|
+
 | Where is the source code    | <working directory>/IGTLRepeater       |
 |-----------------------------|----------------------------------------|
 | Where to build the binaries | <working directory>/IGTLRepeater-build |
-|-----------------------------|----------------------------------------|
 
-|------------------|----------------------------------------|
+
 | Name             | Value                                  |
 |------------------|----------------------------------------|
 | CMAKE_BUILD_TYPE | Release                                |
 | OpenIGTLink_DIR  | <working directory>/OpenIGTLink-build  |
-|------------------|----------------------------------------|
+
 
 then, click `Configure` followed by `Generate`.
 
