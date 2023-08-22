@@ -210,6 +210,38 @@ int Session::Process()
 
   this->logger->Print(ss.str());
 
+  // Check if the message type is blacklisted
+  std::vector<std::string>::iterator it;
+  for (it = this->blackList.begin(); it != this->blackList.end(); it ++)
+    {
+    if (strcmp(headerMsg->GetDeviceType(), (*it).c_str()) == 0)
+      {
+      std::stringstream ss;
+      ss << "Blocked message type detected: " << headerMsg->GetDeviceType() << std::endl;
+      igtlUint64 remain = headerMsg->GetBodySizeToRead();
+      ss << "  Body size = " << remain << std::endl;
+      igtlUint64 block  = 256;
+      igtlUint64 n = 0;
+      do
+        {
+        if (remain < block)
+          {
+          block = remain;
+          }
+
+        bool timeout(false);
+        n = fromSocket->Receive(dummy, block, timeout, 0);
+        if (n <= 0)
+          {
+          break;
+          }
+        remain -= n;
+        }
+      while (remain > 0);
+      return 0;
+      }
+    }
+
   // Check data type and receive data body
   if (strcmp(headerMsg->GetDeviceType(), "TRANSFORM") == 0)
     {
@@ -298,7 +330,10 @@ int Session::Process()
 
     std::stringstream ss;
     ss << std::endl;
-    this->logger->Print(ss.str());
+    if (this->logger.IsNotNull())
+      {
+      this->logger->Print(ss.str());
+      }
     }
 
   return 0;

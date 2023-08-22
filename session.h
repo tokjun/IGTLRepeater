@@ -48,6 +48,12 @@ public:
     this->Name = name;
   };
 
+  void SetBlackList(std::vector<std::string> & blist)
+  {
+    this->blackList = blist;
+  };
+
+
   static void    MonitorThreadFunction(void * ptr);
 
 protected:
@@ -87,7 +93,9 @@ protected:
   igtl::MutexLock * fromLock;
   igtl::MutexLock * toLock;
 
-  igtl::Logger * logger;
+  std::vector<std::string> blackList;
+
+  igtl::Logger::Pointer logger;
 
   int id;
   int nThread;

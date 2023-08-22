@@ -39,27 +39,43 @@
 #include "igtlMultiThreader.h"
 #include "igtlOSUtil.h"
 
-
-int ServerSession(igtl::Socket* socket, char* dest_hostname, int dest_port);
+int ServerSession(igtl::Socket* serverSocket, const char* dest_hostname, int dest_port, std::vector< std::string > blacklist);
 
 int main(int argc, char* argv[])
 {
   //------------------------------------------------------------
   // Parse Arguments
+  //
+  std::vector< std::string > blacklist;
+  std::vector< std::string > args;
 
-  if (argc != 4) // check number of arguments
+  for (int i = 1; i < argc; i ++)
+    {
+    if (strcmp(argv[i], "-b") == 0)
+      {
+      blacklist.push_back(argv[i+1]);
+      i ++;
+      }
+    else
+      {
+      args.push_back(argv[i]);
+      }
+    }
+
+  if (args.size() != 3)
     {
     // If not correct, print usage
-    std::cerr << " Usage: " << argv[0] << " <dest_hostname> <dest_port> <port>"    << std::endl;
+    std::cerr << " Usage: " << argv[0] << "[{-b <btype>}...] <dest_hostname> <dest_port> <port>"    << std::endl;
+    std::cerr << "    <btype>         : A message type to be blocked."                        << std::endl;
     std::cerr << "    <dest_hostname> : IP or hostname of the destination host"                    << std::endl;
     std::cerr << "    <dest_port>     : Port # of the destination host (18944 in Slicer default)"   << std::endl;
     std::cerr << "    <port>          : Port # of this host (18944 in default)"   << std::endl;
     exit(0);
     }
 
-  char*  dest_hostname = argv[1];
-  int    dest_port     = atoi(argv[2]);
-  int    port          = atoi(argv[3]);
+  std::string  dest_hostname = args[0];
+  int    dest_port     = std::stoi(args[1]);
+  int    port          = std::stoi(args[2]);
 
   // Start a server to wait for connection from the client.
   igtl::ServerSocket::Pointer serverSocket;
@@ -69,7 +85,7 @@ int main(int argc, char* argv[])
   if (r < 0)
     {
     std::cerr << "Cannot create a server socket." << std::endl;
-    return 1;
+    exit(0);
     }
 
   igtl::Socket::Pointer socket;
@@ -82,7 +98,7 @@ int main(int argc, char* argv[])
 
     if (socket.IsNotNull()) // if client connected
       {
-      ServerSession(socket, dest_hostname, dest_port);
+      ServerSession(socket, dest_hostname.c_str(), dest_port, blacklist);
       //------------------------------------------------------------
       // Close connection (The example code never reaches to this section ...)
       std::cerr << "Closing the server socket." << std::endl;
@@ -94,8 +110,7 @@ int main(int argc, char* argv[])
 
 }
 
-
-int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port)
+int ServerSession(igtl::Socket* serverSocket, const char* dest_hostname, int dest_port, std::vector< std::string > blacklist)
 {
   //------------------------------------------------------------
   // Establish Connection
@@ -121,11 +136,13 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
   // and 'serverSocket' is waiting for connection from the client host.
   sessionDown->SetSockets(clientSocket, serverSocket);
   sessionDown->SetMutexLocks(clientLock, serverLock);
+  sessionDown->SetBlackList(blacklist);
   sessionDown->SetLogger(logger);
   sessionDown->SetName("S->C");
 
   sessionUp->SetSockets(serverSocket, clientSocket);
   sessionUp->SetMutexLocks(serverLock, clientLock);
+  sessionUp->SetBlackList(blacklist);
   sessionUp->SetLogger(logger);
   sessionUp->SetName("C->S");
 
