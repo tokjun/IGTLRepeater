@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
   if (r < 0)
     {
     std::cerr << "Cannot create a server socket." << std::endl;
-    exit(0);
+    return 1;
     }
 
   igtl::Socket::Pointer socket;
@@ -89,6 +89,9 @@ int main(int argc, char* argv[])
       socket->CloseSocket();
       }
     }
+
+  return 0;
+
 }
 
 
@@ -140,6 +143,8 @@ int ServerSession(igtl::Socket* serverSocket, char* dest_hostname, int dest_port
 
   std::cerr << "Closing the client socket." << std::endl;
   clientSocket->CloseSocket();
+
+  return 1;
 
 }
 
