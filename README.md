@@ -1,9 +1,92 @@
 # IGTLRepeater
 A bridge to relay OpenIGTLink messages between two hosts for debugging.
 
-# Usage
+## Prerequisite
 
-## Basics
+The IGTLRepeater (in principle) works on Linux, Mac, and Windows. To build the software, the following tools are required:
+
+- C++ compiler (g++, llvm c++, or Visual Studio)
+- CMake
+
+## Installation
+
+### OpenIGTLink
+
+The OpenIGTLink library must be built on the computer before comiling the IGTLRepeater. To install the OpenIGTLink library:
+
+~~~~
+$ cd <working directory>
+$ git clone https://github.com/openigtlink/OpenIGTLink
+$ mkdir OpenIGTLink-build
+~~~~
+
+You can configure the source code with CMake, from either CMake GUI or `ccmake` interface, or using the `cmake` command. The library can be compiled with the default parameters, though using the `Release` mode could improve the performance. If you are using either CMake GUI or ccamek interface,
+
+|-----------------------------|---------------------------------------|
+| Where is the source code    | <working directory>/OpenIGTLink       |
+|-----------------------------|---------------------------------------|
+| Where to build the binaries | <working directory>/OpenIGTLink-build |
+|-----------------------------|---------------------------------------|
+
+
+|------------------|-------------------------------|
+| Name             | Value                         |
+|------------------|-------------------------------|
+| CMAKE_BUILD_TYPE | Release                       |
+|------------------|-------------------------------|
+
+then, click `Configure` followed by `Generate`.
+
+If you are configuring with the `cmake` commmand:
+
+~~~~
+$ cd OpenIGTLink-build
+$ cmake -DCMAKE_BUILD_TYPE:STRING=Relase ../OpenIGTLink
+~~~~
+
+Once the source code has been configured, run `make` (or build from Visual Studio).
+
+
+### IGTLRepeater
+
+Similarly, IGTLRepeater can be configured with CMake, and then built with the C++ compalier.
+
+~~~~
+$ cd <working directory>
+$ git clone https://github.com/tokjun/IGTLRepeater
+$ mkdir IGTLRepeater-build
+~~~~
+
+If using CMake GUI or `ccmake`, 
+
+|-----------------------------|----------------------------------------|
+| Where is the source code    | <working directory>/IGTLRepeater       |
+|-----------------------------|----------------------------------------|
+| Where to build the binaries | <working directory>/IGTLRepeater-build |
+|-----------------------------|----------------------------------------|
+
+|------------------|----------------------------------------|
+| Name             | Value                                  |
+|------------------|----------------------------------------|
+| CMAKE_BUILD_TYPE | Release                                |
+| OpenIGTLink_DIR  | <working directory>/OpenIGTLink-build  |
+|------------------|----------------------------------------|
+
+then, click `Configure` followed by `Generate`.
+
+If you are configuring with the `cmake` commmand:
+
+~~~~
+$ cd IGTLRepeater-build
+$ cmake -DCMAKE_BUILD_TYPE:STRING=Relase -DOpenIGTLink_DIR:PATH=<working directory>/OpenIGTLink-build ../IGTLRepeater
+~~~~
+
+Once the source code has been configured, run `make` (or build from Visual Studio).
+
+
+## Usage
+
+### Basics
 We assume the following configuration:
 
 ~~~~
